@@ -1,3 +1,14 @@
+v2.1.17
+
+加固 AstrBot tool loop 输出链路, 防止工具调用前导语和 reasoning 片段外泄.
+
+Bug Fixes:
+
+- 在 `ToolLoopAgentRunner` 层拦截工具调用轮次, 丢弃工具调用前的可见 LLM 草稿.
+- 工具可用时临时关闭 provider streaming, 等最终 `tools_call_name` 落定后再决定输出.
+- 保持无工具请求的正常流式输出时序, 避免把普通回复攒到末尾批量发送.
+- 增加 runner hook 回归测试, 覆盖工具前导语丢弃, 异常恢复和流式时序.
+
 v2.1.16
 
 完成自用补丁身份迁移, 避免继续命中上游插件市场更新源.
