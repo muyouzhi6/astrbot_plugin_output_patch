@@ -1,3 +1,13 @@
+v2.1.16
+
+完成自用补丁身份迁移, 避免继续命中上游插件市场更新源.
+
+Maintenance:
+
+- 将插件内部名称从 `astrbot_plugin_outputpro` 改为 `astrbot_plugin_output_patch`.
+- 将默认插件目录和插件数据目录切换到 `astrbot_plugin_output_patch`.
+- 更新文档中的迁移说明, 旧配置需要复制为 `astrbot_plugin_output_patch_config.json`.
+
 v2.1.15
 
 将 fork 转为自用 AstrBot 输出补丁版本.

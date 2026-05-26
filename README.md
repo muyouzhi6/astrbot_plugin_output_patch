@@ -1,7 +1,7 @@
 
 <div align="center">
 
-![:name](https://count.getloli.com/@astrbot_plugin_outputpro?name=astrbot_plugin_outputpro&theme=minecraft&padding=6&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)
+![:name](https://count.getloli.com/@astrbot_plugin_output_patch?name=astrbot_plugin_output_patch&theme=minecraft&padding=6&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)
 
 # 输出补丁
 
@@ -286,7 +286,7 @@ _✨ 自用 AstrBot 输出链路补丁 ✨_
 
 ## 📦 安装
 
-这是自用补丁仓库, 不再按上游插件市场流程维护. 手动部署时把仓库内容放到 AstrBot 的 `data/plugins/astrbot_plugin_outputpro` 目录, 原 `astrbot_plugin_outputpro_config.json` 配置可以继续沿用.
+这是自用补丁仓库, 不再按上游插件市场流程维护. 手动部署时把仓库内容放到 AstrBot 的 `data/plugins/astrbot_plugin_output_patch` 目录. 从旧 OutputPro 迁移时, 将原 `astrbot_plugin_outputpro_config.json` 复制为 `astrbot_plugin_output_patch_config.json`.
 
 ## ⌨️ 使用说明
 
@@ -304,4 +304,4 @@ _✨ 自用 AstrBot 输出链路补丁 ✨_
 ## 📌 注意事项
 
 - 这是自用补丁版本, 后续问题直接在本仓库继续修.
-- 为了兼容既有配置, 插件目录名和 metadata `name` 暂时保留为 `astrbot_plugin_outputpro`.
+- 插件内部名已改为 `astrbot_plugin_output_patch`, 避免 AstrBot 插件市场把它识别成上游 `astrbot_plugin_outputpro`.

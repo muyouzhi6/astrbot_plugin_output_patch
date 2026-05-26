@@ -281,4 +281,4 @@ class PluginConfig(ConfigNode):
         super().__init__(cfg)
         self.context = context
         self.admins_id: list[str] = context.get_config().get("admins_id", [])
-        self.data_dir = StarTools.get_data_dir("astrbot_plugin_outputpro")
+        self.data_dir = StarTools.get_data_dir("astrbot_plugin_output_patch")

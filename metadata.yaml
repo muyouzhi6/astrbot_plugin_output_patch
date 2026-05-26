@@ -1,8 +1,8 @@
-name: astrbot_plugin_outputpro
+name: astrbot_plugin_output_patch
 display_name: "输出补丁"
 short_desc: "面向自用 AstrBot 的输出链路补丁包"
 desc: "AstrBot 输出补丁: 在发送前处理图片外显, 报错拦截, 消息过滤, 艾特解析, 文本清洗, 文本替换, TTS, 文转图片, 智能引用, 合并转发, 自动撤回和分段回复."
-help: "自用输出链路补丁, 配置迁移沿用 astrbot_plugin_outputpro."
-version: v2.1.15
+help: "自用输出链路补丁, 已从 astrbot_plugin_outputpro 迁移配置."
+version: v2.1.16
 author: muyouzhi6
 repo: https://github.com/muyouzhi6/astrbot_plugin_output_patch
