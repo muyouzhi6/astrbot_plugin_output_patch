@@ -1,0 +1,563 @@
+{
+    "pipeline": {
+        "description": "管道配置",
+        "type": "object",
+        "hint": "管道配置，用于配置组件的启停和运行顺序",
+        "items": {
+            "lock_order": {
+                "description": "锁定顺序",
+                "hint": "锁定后将按内置顺序执行：图片外显 → 报错处理 → 消息拦截 → 解析艾特 → 文本清洗 → 文本替换 → 文转语音 → 文转图片 → 智能引用 → 合并转发 → 自动撤回 → 分段回复",
+                "type": "bool",
+                "default": true
+            },
+            "steps": {
+                "description": "启用的步骤",
+                "hint": "勾选表示启用该步骤；未锁定顺序时，将按当前列表顺序执行",
+                "type": "list",
+                "options": [
+                    "summary(图片外显)",
+                    "error(报错处理)",
+                    "block(消息拦截)",
+                    "at(解析艾特)",
+                    "clean(文本清洗)",
+                    "replace(文本替换)",
+                    "tts(文转语音)",
+                    "t2i(文转图片)",
+                    "reply(智能引用)",
+                    "forward(合并转发)",
+                    "recall(自动撤回)",
+                    "split(分段回复)"
+                ],
+                "default": [
+                    "summary(图片外显)",
+                    "error(报错处理)",
+                    "block(消息拦截)",
+                    "at(解析艾特)",
+                    "clean(文本清洗)",
+                    "replace(文本替换)",
+                    "tts(文转语音)",
+                    "t2i(文转图片)",
+                    "reply(智能引用)",
+                    "forward(合并转发)",
+                    "recall(自动撤回)",
+                    "split(分段回复)"
+                ]
+            },
+            "llm_steps": {
+                "description": "仅作用于 LLM 回复的步骤",
+                "hint": "勾选后，该步骤仅在 LLM 回复时生效，普通插件消息不会经过该步骤",
+                "type": "list",
+                "options": [
+                    "summary(图片外显)",
+                    "error(报错处理)",
+                    "block(消息拦截)",
+                    "at(解析艾特)",
+                    "clean(文本清洗)",
+                    "replace(文本替换)",
+                    "tts(文转语音)",
+                    "t2i(文转图片)",
+                    "reply(智能引用)",
+                    "forward(合并转发)",
+                    "recall(自动撤回)",
+                    "split(分段回复)"
+                ],
+                "default": [
+                    "block(消息拦截)",
+                    "at(解析艾特)",
+                    "clean(文本清洗)",
+                    "replace(文本替换)",
+                    "tts(文转语音)",
+                    "reply(智能引用)",
+                    "split(分段回复)"
+                ]
+            }
+        }
+    },
+    "summary": {
+        "description": "【图片外显】",
+        "hint": "为单张图片消息插入外显金句。外显指的是：在 QQ 群列表中，原本显示“[图片]”的位置会替换为更丰富的文本（仅 aiocqhttp 平台可用）",
+        "type": "object",
+        "items": {
+            "quotes": {
+                "description": "默认图片外显金句",
+                "hint": "随机抽取一句金句用于图片外显。可按需自行补充",
+                "type": "list",
+                "default": [
+                    "你已被移出群聊",
+                    "[群主女装图]",
+                    "哎呦，你干嘛~",
+                    "Ciallo～(∠・ω< )⌒☆"
+                ]
+            },
+            "quotes_files": {
+                "description": "金句文件路径",
+                "hint": "可在文件中维护金句。支持相对路径与绝对路径，请使用 / 作为路径分隔符。可填写多个路径，系统会与默认金句合并后随机抽取",
+                "type": "list",
+                "default": [
+                    "data/plugins/astrbot_plugin_outputpro/default_quotes.json"
+                ]
+            }
+        }
+    },
+    "error": {
+        "description": "【报错处理】",
+        "type": "object",
+        "hint": "全局拦截报错",
+        "items": {
+            "keywords": {
+                "description": "检测报错所用关键词",
+                "hint": "当 Bot 消息包含列表中任一关键词时，将触发拦截",
+                "type": "list",
+                "default": [
+                    "请求失败",
+                    "出现异常"
+                ]
+            },
+            "custom_msg": {
+                "description": "原对话的消息",
+                "hint": "当报错被拦截时，会在原对话中发送此消息。留空则不发送",
+                "type": "string",
+                "default": ""
+            },
+            "forward_umo": {
+                "description": "转发目标会话 ID",
+                "hint": "将报错信息转发到该会话。可用 sid 命令查看当前会话 ID。填 admin 表示转发给配置中的所有 Bot 管理员；留空则不转发",
+                "type": "string",
+                "default": "admin"
+            }
+        }
+    },
+    "block": {
+        "description": "【消息拦截】",
+        "type": "object",
+        "hint": "根据各种条件对消息进行拦截",
+        "items": {
+            "timeout": {
+                "description": "超时拦截秒数",
+                "hint": "若 Bot 回复耗时超过该阈值（秒），则判定为超时并拦截该消息。可缓解 LLM 响应过慢导致的“错位回复”问题",
+                "type": "int",
+                "slider": {
+                    "min": 0,
+                    "max": 180,
+                    "step": 1
+                },
+                "default": 0
+            },
+            "block_reread": {
+                "description": "拦截流口水的消息",
+                "type": "bool",
+                "hint": "一些劣质模型容易出现流口水现象，即一直回复相同的内容，此时可拦截此消息",
+                "default": true
+            },
+            "block_words": {
+                "description": "拦截关键词",
+                "hint": "当 Bot 消息包含列表中任一关键词时，将触发拦截",
+                "type": "list",
+                "default": [
+                    "抱歉",
+                    "您好",
+                    "请稍后",
+                    "隐私政策",
+                    "作为AI助手",
+                    "作为一个AI",
+                    "我理解您的感受",
+                    "让我来为您解释",
+                    "根据相关法规",
+                    "很抱歉给您带来不便",
+                    "感谢您的理解",
+                    "感谢您的耐心等待",
+                    "为您带来的不便深表歉意",
+                    "如有需要请随时联系",
+                    "如果您还有其他问题",
+                    "我将尽力为您提供帮助",
+                    "希望我的回答对您有所帮助",
+                    "该问题需要进一步核实",
+                    "请您理解并配合",
+                    "暂时无法提供相关信息",
+                    "不支持该请求",
+                    "不在支持范围内",
+                    "该内容暂不可用",
+                    "出于安全原因",
+                    "出于合规要求",
+                    "为保障您的账户安全",
+                    "为了保护您的隐私",
+                    "根据平台规则",
+                    "根据系统检测",
+                    "由系统自动生成"
+                ]
+            }
+        }
+    },
+    "at": {
+        "description": "【解析艾特】",
+        "type": "object",
+        "hint": "将消息句首的假艾特转换为真实艾特，并按概率决定保留或移除",
+        "default": true,
+        "items": {
+            "at_str": {
+                "description": "转换成字符串艾特",
+                "hint": "将解析到的真实艾特转换回字符串形式（如 @username xxx）。若出现艾特与文本间空格丢失，可尝试开启",
+                "type": "bool",
+                "default": true
+            },
+            "at_prob": {
+                "description": "艾特概率",
+                "hint": "随机值小于该值时强制带 @，大于该值时强制不带 @。设为 0 表示关闭该功能。建议先关闭 AstrBot 自带的 At 功能",
+                "type": "float",
+                "slider": {
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.001
+                },
+                "default": 0.01
+            }
+        }
+    },
+    "clean": {
+        "description": "【文本清理】",
+        "type": "object",
+        "hint": "清理文本。注意清洗顺序：中括号内容 -> 小括号内容 -> 情绪标签 -> emoji -> 句首字符 -> 句尾字符 -> 整体清洗特殊符号",
+        "items": {
+            "text_threshold": {
+                "description": "文本清理长度阈值",
+                "hint": "多少个字符以下时执行文本清理，可以防止对长文本误清理，设为 0 则不执行文本清理",
+                "type": "int",
+                "slider": {
+                    "min": 0,
+                    "max": 1000,
+                    "step": 50
+                },
+                "default": 150
+            },
+            "bracket": {
+                "description": "摘除中括号内容",
+                "hint": "即摘除消息中的 [...] ",
+                "type": "bool",
+                "default": true
+            },
+            "parenthesis": {
+                "description": "摘除小括号内容",
+                "hint": "摘除消息中的 (...) 内容，支持半角与全角括号",
+                "type": "bool",
+                "default": true
+            },
+            "emotion_tag": {
+                "description": "摘除情绪标签",
+                "hint": "摘除消息中的 &&...&& 内容；若不生效，可能被其他插件干扰",
+                "type": "bool",
+                "default": true
+            },
+            "emoji": {
+                "description": "清理 Emoji",
+                "hint": "清理文本中的 Emoji，对高频使用 Emoji 的模型效果更明显（如部分智谱模型）",
+                "type": "bool",
+                "default": true
+            },
+            "lead": {
+                "description": "去除句首字符",
+                "hint": "对某些喜欢输出前缀的模型有奇效，注意只去除句首字符",
+                "type": "list",
+                "default": [
+                    "print",
+                    ":",
+                    "："
+                ]
+            },
+            "tail": {
+                "description": "去除句尾字符",
+                "hint": "对某些喜欢输出句号的模型有奇效，注意只去除句尾字符",
+                "type": "list",
+                "default": [
+                    "。",
+                    "."
+                ]
+            },
+            "punctuation": {
+                "description": "整体清洗的特殊符号",
+                "hint": "填写正则表达式，例如 [#%~]。该规则会作用于整句文本",
+                "type": "string",
+                "default": "[#%~]"
+            }
+        }
+    },
+    "replace": {
+        "description": "【文本替换】",
+        "type": "object",
+        "hint": "替换消息中的特定词，如一些敏感词",
+        "items": {
+            "words": {
+                "description": "替换词对",
+                "hint": "格式为“旧词 新词”：旧词在前，中间空格分隔，新词在后（新词可留空，留空时使用默认替换词）",
+                "type": "list",
+                "default": [
+                    "示例旧词1 示例新词1",
+                    "示例旧词2"
+                ]
+            },
+            "default_new_word": {
+                "description": "默认替换词",
+                "hint": "当替换词对中不填新词时采用的替换词，默认为星号，星号个数等于旧词长度",
+                "type": "string",
+                "default": "*"
+            }
+        }
+    },
+    "tts": {
+        "description": "【文转语音】",
+        "type": "object",
+        "hint": "将文本回复转为语音。支持两种模式：优先使用所选 TTS 模型；未选择时走 QQ 声聊中转（可被其他平台复用）",
+        "items": {
+            "tts_provider_id": {
+                "description": "可选 TTS 模型",
+                "type": "string",
+                "_special": "select_provider_tts",
+                "hint": "留空表示不启用模型，改走 QQ 声聊中转；选择后优先使用该 TTS Provider 生成语音",
+                "default": ""
+            },
+            "group_id": {
+                "description": "中转群群号",
+                "hint": "使用 QQ 声聊中转时填写。模型 TTS 模式下可留空",
+                "type": "string",
+                "default": ""
+            },
+            "character_id": {
+                "description": "默认 AI 语音角色",
+                "hint": "在 QQ 声聊中转模式下，将文本转为语音时使用该角色",
+                "type": "string",
+                "options": [
+                    "lucy-voice-laibixiaoxin",
+                    "lucy-voice-houge",
+                    "lucy-voice-silang",
+                    "lucy-voice-guangdong-f1",
+                    "lucy-voice-guangxi-m1",
+                    "lucy-voice-daji",
+                    "lucy-voice-lizeyan",
+                    "lucy-voice-suxinjiejie",
+                    "lucy-voice-m8",
+                    "lucy-voice-male1",
+                    "lucy-voice-male3",
+                    "lucy-voice-lvbu",
+                    "lucy-voice-xueling",
+                    "lucy-voice-f37",
+                    "lucy-voice-male2",
+                    "lucy-voice-female1",
+                    "lucy-voice-m14",
+                    "lucy-voice-f38",
+                    "lucy-voice-m101",
+                    "lucy-voice-female2",
+                    "lucy-voice-f36",
+                    "lucy-voice-f34"
+                ],
+                "labels": [
+                    "小新",
+                    "猴哥",
+                    "四郎",
+                    "东北老妹儿",
+                    "广西大表哥",
+                    "妲己",
+                    "霸道总裁",
+                    "酥心御姐",
+                    "说书先生",
+                    "憨憨小弟",
+                    "憨厚老哥",
+                    "吕布",
+                    "元气少女",
+                    "文艺少女",
+                    "磁性大叔",
+                    "邻家小妹",
+                    "低沉男声",
+                    "傲娇少女",
+                    "爹系男友",
+                    "暖心姐姐",
+                    "温柔妹妹",
+                    "书香少女"
+                ],
+                "default": "lucy-voice-f36"
+            },
+            "threshold": {
+                "description": "文本长度阈值",
+                "hint": "超过此长度的文本不会被转成语音发送",
+                "type": "int",
+                "slider": {
+                    "min": 0,
+                    "max": 300,
+                    "step": 10
+                },
+                "default": 50
+            },
+            "prob": {
+                "description": "触发 TTS 的概率",
+                "hint": "随机值小于该概率时触发 TTS",
+                "type": "float",
+                "slider": {
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.01
+                },
+                "default": 0.1
+            }
+        }
+    },
+    "t2i": {
+        "description": "【文转图片】",
+        "type": "object",
+        "hint": "将长文本转为图片。本插件使用 pillowmd 渲染，轻量且稳定。建议开启前先关闭 AstrBot 自带的长文本转图功能",
+        "items": {
+            "threshold": {
+                "description": "文本长度阈值",
+                "hint": "当消息长度超过该阈值时，执行长文本转图处理",
+                "type": "int",
+                "slider": {
+                    "min": 0,
+                    "max": 1000,
+                    "step": 50
+                },
+                "default": 150
+            },
+            "pillowmd_style_dir": {
+                "description": "Pillowmd 样式目录",
+                "hint": "支持相对路径与绝对路径，请使用 / 作为路径分隔符",
+                "type": "string",
+                "default": "data/plugins/astrbot_plugin_outputpro/t2i_style"
+            },
+            "auto_page": {
+                "description": "自动分页",
+                "hint": "开启后，渲染器会按照黄金分割比进行分页",
+                "type": "bool",
+                "default": true
+            },
+            "clean_cache": {
+                "description": "自动清理缓存",
+                "hint": "开启后，重载插件时，会自动清空图片缓存",
+                "type": "bool",
+                "default": true
+            }
+        }
+    },
+    "reply": {
+        "description": "【智能引用】",
+        "type": "object",
+        "hint": "当 Bot 准备回复的消息被他人插入新消息时，自动引用目标消息",
+        "items": {
+            "threshold": {
+                "description": "引用阈值",
+                "hint": "设置“被插入多少条消息后触发引用”。设为 0 表示关闭引用功能。建议先关闭 AstrBot 自带 Reply 功能",
+                "type": "int",
+                "slider": {
+                    "min": 0,
+                    "max": 4,
+                    "step": 1
+                },
+                "default": 1
+            },
+            "include_at": {
+                "description": "引用时包含艾特",
+                "hint": "开启后，在引用回复的同时会艾特被回复的人",
+                "type": "bool",
+                "default": false
+            }
+        }
+    },
+    "forward": {
+        "description": "【合并转发】",
+        "hint": "将长文本合并转发（aiocqhttp 平台为合并转发，Telegram 平台为折叠引用）",
+        "type": "object",
+        "items": {
+            "threshold": {
+                "description": "文本长度阈值",
+                "hint": "转发长度超过此阈值时执行转发操作",
+                "type": "int",
+                "slider": {
+                    "min": 0,
+                    "max": 1000,
+                    "step": 50
+                },
+                "default": 150
+            },
+            "node_name": {
+                "description": "转发节点昵称",
+                "hint": "转发消息时使用的昵称。留空则自动使用 Bot 当前昵称",
+                "type": "string",
+                "default": ""
+            }
+        }
+    },
+    "recall": {
+        "description": "【自动撤回】",
+        "hint": "检测发出的消息是否需要撤回，并按延时执行撤回（当前支持 aiocqhttp 与 Telegram）",
+        "type": "object",
+        "items": {
+            "keywords": {
+                "description": "触发撤回的关键词",
+                "hint": "消息中含有这些关键词时触发自动撤回操作",
+                "type": "list",
+                "default": [
+                    "我是",
+                    "我叫",
+                    "我住在"
+                ]
+            },
+            "delay": {
+                "description": "撤回延时",
+                "hint": "消息发送后延迟多少秒执行撤回",
+                "type": "int",
+                "slider": {
+                    "min": 0,
+                    "max": 110,
+                    "step": 1
+                },
+                "default": 30
+            }
+        }
+    },
+    "split": {
+        "description": "【分段回复】",
+        "hint": "将一条长消息拆分为多段后依次发送",
+        "type": "object",
+        "items": {
+            "char_list": {
+                "description": "触发分段的字符",
+                "hint": "当文本命中这些字符时触发分段（换行为 \\n，空格为 \\s），如：，。？！\\n。注意：括号/引号等成对符号内部不会触发分段",
+                "type": "list",
+                "default": [
+                    "。",
+                    "？",
+                    "\\n"
+                ]
+            },
+            "max_count": {
+                "description": "最大分段数",
+                "hint": "超过此数量则不再分段",
+                "type": "int",
+                "slider": {
+                    "min": 1,
+                    "max": 5,
+                    "step": 1
+                },
+                "default": 2
+            },
+            "typing_cps": {
+                "description": "打字速度",
+                "type": "float",
+                "hint": "模拟打字速度（字/秒），6~10 更像真人。延迟时间（秒）≈ 字数 / 打字速度",
+                "slider": {
+                    "min": 1,
+                    "max": 20,
+                    "step": 1
+                },
+                "default": 8
+            },
+            "max_delay_cap": {
+                "description": "最大延迟",
+                "hint": "对于超长文本，算得的延迟时间超过最大延迟时间时，采用最大延迟时间进行延迟",
+                "type": "int",
+                "slider": {
+                    "min": 0,
+                    "max": 10,
+                    "step": 1
+                },
+                "default": 5
+            }
+        }
+    }
+}
