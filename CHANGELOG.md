@@ -1,3 +1,14 @@
+v2.1.18
+
+加固最终出站清洗, 防止思维链, provider 调试对象和内部状态块进入可见对话.
+
+Bug Fixes:
+
+- 过滤未闭合的 `&&think` / `<think>` 思维链片段, 避免模型把推理草稿当正文发出.
+- 拦截 `ChatCompletion(...)`, `tool_calls=...`, `function_call=...`, `reasoning_content=...` 等 provider 调试结构文本.
+- 移除 `[Current mood: ...]`, `(Wear: ...)`, `(Current status: ...)` 这类内部状态块, 同时保留正常可见回复.
+- 增加 sanitize 回归测试, 覆盖私有输出删除和普通“工具调用”技术讨论不误杀.
+
 v2.1.17
 
 加固 AstrBot tool loop 输出链路, 防止工具调用前导语和 reasoning 片段外泄.

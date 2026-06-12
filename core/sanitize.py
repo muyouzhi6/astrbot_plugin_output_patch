@@ -40,6 +40,27 @@ GENERIC_TAG_PATTERN = re.compile(
     r"(?![0-9A-Za-z])"
 )
 TTS_SPEED_TAG_PATTERN = re.compile(r"<#\s*\d+(?:\.\d{1,2})?\s*#>")
+PRIVATE_THINK_BLOCK_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("think_xml", re.compile(r"<think(?:ing)?>.*?</think(?:ing)?>", re.IGNORECASE | re.DOTALL)),
+    ("think_fence", re.compile(r"```(?:thinking|reasoning|thoughts?)\b.*?```", re.IGNORECASE | re.DOTALL)),
+)
+PRIVATE_STATE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("current_mood", re.compile(r"\[Current mood:[^\]\r\n]{0,200}\]", re.IGNORECASE)),
+    ("wear_state", re.compile(r"\(Wear:.*?\)", re.IGNORECASE | re.DOTALL)),
+    ("current_status", re.compile(r"\(Current status:.*?\)", re.IGNORECASE | re.DOTALL)),
+)
+PRIVATE_DEBUG_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("chat_completion_repr", re.compile(r"\bChatCompletion(?:Message)?\(", re.IGNORECASE)),
+    ("tool_call_repr", re.compile(r"\bChatCompletionMessageFunctionToolCall\(", re.IGNORECASE)),
+    ("function_arguments_repr", re.compile(r"\bFunction\(arguments=", re.IGNORECASE)),
+    ("tool_calls_field", re.compile(r"\btool_calls\s*=\s*\[", re.IGNORECASE)),
+    ("function_call_field", re.compile(r"\bfunction_call\s*=", re.IGNORECASE)),
+    ("reasoning_content_field", re.compile(r"\breasoning_content\s*=", re.IGNORECASE)),
+    ("reasoning_field", re.compile(r"\breasoning\s*=", re.IGNORECASE)),
+    ("completion_usage_repr", re.compile(r"\bCompletionUsage\(", re.IGNORECASE)),
+    ("no_usable_output_error", re.compile(r"OpenAI completion has no usable output", re.IGNORECASE)),
+)
+UNMATCHED_THINK_START_RE = re.compile(r"<think(?:ing)?>|&&\s*think\b", re.IGNORECASE)
 ASCII_WRAPPED_TAG_RE = re.compile(
     r"(?:EMO(?:\s*[:：-]\s*[A-Za-z_-]{1,24})?|[A-Za-z][A-Za-z0-9_-]{0,23})",
     re.IGNORECASE,
@@ -165,6 +186,34 @@ def _remove_generic_tags(
     return current
 
 
+def _remove_private_output(text: str, report: TextProcessReport) -> str:
+    current = text
+
+    for label, pattern in PRIVATE_DEBUG_PATTERNS:
+        if pattern.search(current):
+            report.add_removed(label, [current[:200]])
+            return ""
+
+    for label, pattern in PRIVATE_THINK_BLOCK_PATTERNS:
+        removed = pattern.findall(current)
+        if removed:
+            report.add_removed(label, [item[:200] for item in removed])
+            current = pattern.sub("", current)
+
+    unmatched = UNMATCHED_THINK_START_RE.search(current)
+    if unmatched:
+        report.add_removed("unmatched_think_block", [current[unmatched.start() : unmatched.start() + 200]])
+        current = current[: unmatched.start()]
+
+    for label, pattern in PRIVATE_STATE_PATTERNS:
+        removed = pattern.findall(current)
+        if removed:
+            report.add_removed(label, [item[:200] for item in removed])
+            current = pattern.sub("", current)
+
+    return current
+
+
 def _tidy_spacing(text: str) -> str:
     text = LINE_SPACE_RE.sub("\n", text)
     return MULTI_SPACE_RE.sub(" ", text)
@@ -182,6 +231,12 @@ def clean_text(
 
     cleaned = text
     apply_emotion_tag = cfg.emotion_tag if emotion_tag is None else emotion_tag
+
+    cleaned = _remove_private_output(cleaned, report)
+    if cleaned != text:
+        cleaned = _tidy_spacing(cleaned)
+    if not cleaned:
+        return cleaned, report
 
     if cfg.bracket:
         cleaned = _remove_patterns(
