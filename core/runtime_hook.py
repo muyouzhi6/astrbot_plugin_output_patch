@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 from collections.abc import AsyncGenerator
+from contextlib import suppress
 from dataclasses import dataclass
 from functools import wraps
 from typing import Any
@@ -15,7 +16,13 @@ from astrbot.core.platform.platform import Platform
 from astrbot.core.platform.message_type import MessageType
 
 from .config import PluginConfig
-from .sanitize import collect_visible_text, replace_in_chain, sanitize_chain
+from .sanitize import (
+    clean_text,
+    collect_visible_text,
+    replace_in_chain,
+    replace_text,
+    sanitize_chain,
+)
 
 
 @dataclass(slots=True)
@@ -80,6 +87,82 @@ def _has_provider_tools(runner_self: Any) -> bool:
 
     req = getattr(runner_self, "req", None)
     return getattr(req, "func_tool", None) is not None
+
+
+def _set_completion_text(response: Any, text: str) -> None:
+    try:
+        response.completion_text = text
+    except Exception:
+        pass
+    with suppress(Exception):
+        setattr(response, "_completion_text", text)
+
+
+def _sanitize_llm_response(response: Any, config: PluginConfig, *, source: str) -> None:
+    if response is None or getattr(response, "__outputpro_sanitized_llm__", False):
+        return
+
+    changed = False
+    before_fragments: list[str] = []
+    after_fragments: list[str] = []
+
+    result_chain = getattr(response, "result_chain", None)
+    chain = getattr(result_chain, "chain", None)
+    if isinstance(chain, list) and chain:
+        before_plain = collect_visible_text(chain)
+        clean_report = sanitize_chain(chain, config.clean, emotion_tag=False)
+        replace_changes = replace_in_chain(chain, config.replace)
+        after_plain = collect_visible_text(chain)
+        if clean_report.has_removed() or replace_changes:
+            changed = True
+            before_fragments.append(before_plain)
+            after_fragments.append(after_plain)
+        if not chain:
+            with suppress(Exception):
+                response.result_chain = None
+
+    completion_text = getattr(response, "completion_text", None)
+    if isinstance(completion_text, str) and completion_text:
+        cleaned_text, _ = clean_text(
+            completion_text,
+            config.clean,
+            emotion_tag=False,
+        )
+        cleaned_text, _ = replace_text(cleaned_text, config.replace)
+        if cleaned_text != completion_text:
+            changed = True
+            before_fragments.append(completion_text)
+            after_fragments.append(cleaned_text)
+            _set_completion_text(response, cleaned_text)
+
+    reasoning_content = getattr(response, "reasoning_content", None)
+    if isinstance(reasoning_content, str) and reasoning_content:
+        cleaned_reasoning, _ = clean_text(
+            reasoning_content,
+            config.clean,
+            emotion_tag=False,
+        )
+        cleaned_reasoning, _ = replace_text(
+            cleaned_reasoning,
+            config.replace,
+        )
+        if cleaned_reasoning != reasoning_content:
+            changed = True
+            before_fragments.append(reasoning_content)
+            after_fragments.append(cleaned_reasoning)
+            with suppress(Exception):
+                response.reasoning_content = cleaned_reasoning
+
+    with suppress(Exception):
+        setattr(response, "__outputpro_sanitized_llm__", True)
+
+    if changed:
+        logger.debug(
+            "[outputpro:%s] sanitized raw LLM response: %r -> %r",
+            source,
+            "\n".join(before_fragments)[:300],
+            "\n".join(after_fragments)[:300],
+        )
 
 
 async def _flush_pending_visible(
@@ -244,6 +327,8 @@ class RuntimeOutputHook:
             return
 
         def iter_factory(original):
+            hook = self
+
             @wraps(original)
             async def wrapped(runner_self, *args, **kwargs):
                 original_streaming = bool(getattr(runner_self, "streaming", False))
@@ -260,6 +345,11 @@ class RuntimeOutputHook:
 
                 try:
                     async for resp in original(runner_self, *args, **kwargs):
+                        _sanitize_llm_response(
+                            resp,
+                            hook.config,
+                            source="ToolLoopAgentRunner._iter_llm_responses",
+                        )
                         yield resp
                 finally:
                     if disabled_streaming:

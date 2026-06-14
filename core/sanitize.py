@@ -48,17 +48,52 @@ PRIVATE_STATE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("current_mood", re.compile(r"\[Current mood:[^\]\r\n]{0,200}\]", re.IGNORECASE)),
     ("wear_state", re.compile(r"\(Wear:.*?\)", re.IGNORECASE | re.DOTALL)),
     ("current_status", re.compile(r"\(Current status:.*?\)", re.IGNORECASE | re.DOTALL)),
+    (
+        "yaml_private_state",
+        re.compile(
+            r"(?im)^\s*(?:my_)?(?:mood|emotion|status|thought|thinking|reasoning)"
+            r"\s*[:：=]\s*(?:(?!\\[rn])[^\r\n]){0,200}"
+            r"(?:\r?\n|(?:\\r)?\\n|$)"
+        ),
+    ),
+    (
+        "cn_private_state",
+        re.compile(
+            r"(?m)^\s*(?:当前)?(?:情绪|心情|状态|思维链|思考|推理)"
+            r"\s*[:：=]\s*(?:(?!\\[rn])[^\r\n]){0,200}"
+            r"(?:\r?\n|(?:\\r)?\\n|$)"
+        ),
+    ),
+    (
+        "warner_status",
+        re.compile(
+            r"(?im)^\s*Warner\s*[:：]\s*(?:(?!\\[rn])[^\r\n]){0,200}"
+            r"(?:\r?\n|(?:\\r)?\\n|$)"
+        ),
+    ),
 )
 PRIVATE_DEBUG_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("chat_completion_repr", re.compile(r"\bChatCompletion(?:Message)?\(", re.IGNORECASE)),
     ("tool_call_repr", re.compile(r"\bChatCompletionMessageFunctionToolCall\(", re.IGNORECASE)),
     ("function_arguments_repr", re.compile(r"\bFunction\(arguments=", re.IGNORECASE)),
     ("tool_calls_field", re.compile(r"\btool_calls\s*=\s*\[", re.IGNORECASE)),
+    ("tool_calls_json", re.compile(r'"tool_calls"\s*:\s*\[', re.IGNORECASE)),
+    ("tool_call_id_json", re.compile(r'"tool_call_id"\s*:', re.IGNORECASE)),
     ("function_call_field", re.compile(r"\bfunction_call\s*=", re.IGNORECASE)),
+    ("function_call_json", re.compile(r'"function_call"\s*:', re.IGNORECASE)),
     ("reasoning_content_field", re.compile(r"\breasoning_content\s*=", re.IGNORECASE)),
+    ("reasoning_content_json", re.compile(r'"reasoning_content"\s*:', re.IGNORECASE)),
     ("reasoning_field", re.compile(r"\breasoning\s*=", re.IGNORECASE)),
     ("completion_usage_repr", re.compile(r"\bCompletionUsage\(", re.IGNORECASE)),
     ("no_usable_output_error", re.compile(r"OpenAI completion has no usable output", re.IGNORECASE)),
+    ("system_notice", re.compile(r"\[SYSTEM NOTICE\]", re.IGNORECASE)),
+    (
+        "tool_status_line",
+        re.compile(
+            r"(?im)^\s*(?:Agent\s+)?(?:使用工具|调用工具|工具调用|tool\s*(?:call|use|status|result))"
+            r"\s*[:：].*$"
+        ),
+    ),
 )
 UNMATCHED_THINK_START_RE = re.compile(r"<think(?:ing)?>|&&\s*think\b", re.IGNORECASE)
 ASCII_WRAPPED_TAG_RE = re.compile(

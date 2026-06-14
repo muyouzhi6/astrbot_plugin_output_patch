@@ -1,3 +1,14 @@
+v2.1.19
+
+提前加固 AstrBot tool-loop 原始 LLM response, 防止内部状态在进入发送链路, history 或记忆前泄露.
+
+Bug Fixes:
+
+- 在 `ToolLoopAgentRunner._iter_llm_responses` 产出前清洗 `result_chain`, `completion_text` 和 `reasoning_content`, 避免 `content+tool_calls` 混合响应把工具前导语或内部状态写入可见结果.
+- 移除 `my_mood: ...`, `Warner: ...`, `SYSTEM NOTICE`, JSON `tool_calls` / `reasoning_content` 等泄露形态.
+- 收窄状态行正则, 支持真实换行和字面量 `\n`, 删除状态行时保留后续正常正文.
+- 增加 runner hook 和 sanitizer 回归测试, 覆盖 raw response 预清洗和 `my_mood` / `Warner` 泄露样本.
+
 v2.1.18
 
 加固最终出站清洗, 防止思维链, provider 调试对象和内部状态块进入可见对话.

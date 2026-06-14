@@ -146,6 +146,45 @@ def test_removes_private_state_blocks():
     assert {"current_mood", "wear_state", "current_status"} <= set(report.removed)
 
 
+def test_removes_yaml_private_state_line_and_keeps_visible_text():
+    sanitize = load_sanitize()
+
+    cleaned, report = sanitize.clean_text(
+        "my_mood: tired\n起个鬼 才四点多 别吵我睡觉",
+        CleanCfg(),
+        emotion_tag=False,
+    )
+
+    assert cleaned == "起个鬼 才四点多 别吵我睡觉"
+    assert "yaml_private_state" in report.removed
+
+
+def test_removes_literal_newline_private_state_line_and_keeps_visible_text():
+    sanitize = load_sanitize()
+
+    cleaned, report = sanitize.clean_text(
+        r"my_mood: tired\n起个鬼 才四点多 别吵我睡觉",
+        CleanCfg(),
+        emotion_tag=False,
+    )
+
+    assert cleaned == "起个鬼 才四点多 别吵我睡觉"
+    assert "yaml_private_state" in report.removed
+
+
+def test_removes_single_warner_status_line():
+    sanitize = load_sanitize()
+
+    cleaned, report = sanitize.clean_text(
+        "Warner: 准备回复 87袜子",
+        CleanCfg(),
+        emotion_tag=False,
+    )
+
+    assert cleaned == ""
+    assert "warner_status" in report.removed
+
+
 def test_drops_provider_debug_repr():
     sanitize = load_sanitize()
 
@@ -169,6 +208,18 @@ def test_keeps_normal_tool_discussion():
 
     assert cleaned == "后台设置里看下是不是把群聊的工具调用权限给关了，或者群聊没把 tools 传过去"
     assert not report.has_removed()
+
+
+def test_drops_json_tool_call_debug_blob():
+    sanitize = load_sanitize()
+
+    cleaned, report = sanitize.clean_text(
+        '{"tool_calls": [{"function": {"name": "grok_web_search"}}]}',
+        CleanCfg(),
+    )
+
+    assert cleaned == ""
+    assert "tool_calls_json" in report.removed
 
 
 def test_sanitize_chain_prunes_empty_private_output_component():

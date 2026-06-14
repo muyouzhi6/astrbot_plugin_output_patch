@@ -50,7 +50,26 @@ class BaseMessageComponent:
 
 
 class Plain(BaseMessageComponent):
-    pass
+    def __init__(self, text: str = ""):
+        self.text = text
+
+
+class ResultChain:
+    def __init__(self, chain=None):
+        self.chain = chain or []
+
+
+class LLMResponse:
+    def __init__(
+        self,
+        *,
+        result_chain=None,
+        completion_text: str = "",
+        reasoning_content: str = "",
+    ):
+        self.result_chain = result_chain
+        self.completion_text = completion_text
+        self.reasoning_content = reasoning_content
 
 
 class MessageChain:
@@ -79,6 +98,19 @@ class ToolLoopAgentRunner:
         return self.func_tool
 
 
+class CleanConfig:
+    pass
+
+
+class ReplaceConfig:
+    pass
+
+
+class PluginConfig:
+    clean = CleanConfig()
+    replace = ReplaceConfig()
+
+
 def install_import_stubs() -> None:
     logger_module = types.ModuleType("astrbot.api")
     logger_module.logger = DummyLogger()
@@ -105,12 +137,62 @@ def install_import_stubs() -> None:
     runner_module.ToolLoopAgentRunner = ToolLoopAgentRunner
 
     config_module = types.ModuleType("output_patch_under_test.config")
-    config_module.PluginConfig = object
+    config_module.PluginConfig = PluginConfig
 
     sanitize_module = types.ModuleType("output_patch_under_test.sanitize")
-    sanitize_module.collect_visible_text = lambda chain: ""
-    sanitize_module.replace_in_chain = lambda chain, config: []
-    sanitize_module.sanitize_chain = lambda chain, config: DummyCleanReport()
+
+    def collect_visible_text(chain):
+        return " ".join(
+            component.text
+            for component in chain
+            if isinstance(component, Plain) and component.text
+        )
+
+    def clean_text(text, config, *, emotion_tag=None):
+        if text.startswith("my_mood: tired\\n"):
+            return text.removeprefix("my_mood: tired\\n"), DummyCleanReport()
+        if text.startswith("my_mood: tired\n"):
+            return text.removeprefix("my_mood: tired\n"), DummyCleanReport()
+        return text, DummyCleanReport()
+
+    def replace_text(text, config):
+        return text.replace("坏词", "**"), []
+
+    def sanitize_chain(chain, config, *, emotion_tag=None):
+        changed = False
+        kept = []
+        for component in chain:
+            if not isinstance(component, Plain):
+                kept.append(component)
+                continue
+            updated, _ = clean_text(component.text, config, emotion_tag=emotion_tag)
+            updated, _ = replace_text(updated, config)
+            if updated != component.text:
+                changed = True
+                component.text = updated
+            if component.text.strip():
+                kept.append(component)
+        chain[:] = kept
+
+        class Report(DummyCleanReport):
+            def has_removed(self):
+                return changed
+
+        return Report()
+
+    def replace_in_chain(chain, config):
+        changes = []
+        for component in chain:
+            if isinstance(component, Plain) and "坏词" in component.text:
+                component.text = component.text.replace("坏词", "**")
+                changes.append(("'坏词'", "'**'"))
+        return changes
+
+    sanitize_module.clean_text = clean_text
+    sanitize_module.collect_visible_text = collect_visible_text
+    sanitize_module.replace_in_chain = replace_in_chain
+    sanitize_module.replace_text = replace_text
+    sanitize_module.sanitize_chain = sanitize_chain
 
     modules = {
         "astrbot": types.ModuleType("astrbot"),
@@ -165,7 +247,7 @@ async def collect(
 
     ToolLoopAgentRunner.step = original_step
     ToolLoopAgentRunner._iter_llm_responses = original_iter_llm_responses
-    hook = runtime_hook_module.RuntimeOutputHook(config=None)
+    hook = runtime_hook_module.RuntimeOutputHook(config=PluginConfig())
     hook._patch_tool_loop_agent_runner()
 
     runner = ToolLoopAgentRunner()
@@ -189,7 +271,7 @@ async def collect_from_original(
 
     ToolLoopAgentRunner.step = original_step
     ToolLoopAgentRunner._iter_llm_responses = original_iter_llm_responses
-    hook = runtime_hook_module.RuntimeOutputHook(config=None)
+    hook = runtime_hook_module.RuntimeOutputHook(config=PluginConfig())
     hook._patch_tool_loop_agent_runner()
 
     runner = ToolLoopAgentRunner()
@@ -226,7 +308,7 @@ async def collect_iter(
 
     ToolLoopAgentRunner.step = original_step
     ToolLoopAgentRunner._iter_llm_responses = original_iter_llm_responses
-    hook = runtime_hook_module.RuntimeOutputHook(config=None)
+    hook = runtime_hook_module.RuntimeOutputHook(config=PluginConfig())
     hook._patch_tool_loop_agent_runner()
 
     runner = ToolLoopAgentRunner()
@@ -240,6 +322,31 @@ async def collect_iter(
     except Exception as exc:
         error = exc
     return seen, error, observations, runner.streaming
+
+
+async def collect_iter_response(*, runtime_hook_module):
+    raw_response = LLMResponse(
+        result_chain=ResultChain([Plain(r"my_mood: tired\n起个鬼"), Plain("坏词")]),
+        completion_text=r"my_mood: tired\n起个鬼",
+        reasoning_content=r"my_mood: tired\n内部推理",
+    )
+
+    async def original_step(self):
+        for item in getattr(self, "sequence", []):
+            yield item
+
+    async def original_iter_llm_responses(self, *args, **kwargs):
+        yield raw_response
+
+    ToolLoopAgentRunner.step = original_step
+    ToolLoopAgentRunner._iter_llm_responses = original_iter_llm_responses
+    hook = runtime_hook_module.RuntimeOutputHook(config=PluginConfig())
+    hook._patch_tool_loop_agent_runner()
+
+    runner = ToolLoopAgentRunner()
+    runner.streaming = False
+    runner.func_tool = object()
+    return [item async for item in runner._iter_llm_responses()]
 
 
 async def collect_step_state(
@@ -263,7 +370,7 @@ async def collect_step_state(
 
     ToolLoopAgentRunner.step = original_step
     ToolLoopAgentRunner._iter_llm_responses = original_iter_llm_responses
-    hook = runtime_hook_module.RuntimeOutputHook(config=None)
+    hook = runtime_hook_module.RuntimeOutputHook(config=PluginConfig())
     hook._patch_tool_loop_agent_runner()
 
     runner = ToolLoopAgentRunner()
@@ -298,7 +405,7 @@ async def collect_stream_timing(*, runtime_hook_module):
 
     ToolLoopAgentRunner.step = original_step
     ToolLoopAgentRunner._iter_llm_responses = original_iter_llm_responses
-    hook = runtime_hook_module.RuntimeOutputHook(config=None)
+    hook = runtime_hook_module.RuntimeOutputHook(config=PluginConfig())
     hook._patch_tool_loop_agent_runner()
 
     runner = ToolLoopAgentRunner()
@@ -516,6 +623,26 @@ async def main() -> None:
             f"restored={restored_streaming}"
         )
 
+    responses = await collect_iter_response(runtime_hook_module=runtime_hook_module)
+    if len(responses) != 1:
+        raise AssertionError(f"expected one sanitized response, got {responses!r}")
+    response = responses[0]
+    if [item.text for item in response.result_chain.chain] != ["起个鬼", "**"]:
+        raise AssertionError(
+            "raw LLM response result_chain should be sanitized before yielding: "
+            f"{[item.text for item in response.result_chain.chain]!r}"
+        )
+    if response.completion_text != "起个鬼" or response._completion_text != "起个鬼":
+        raise AssertionError(
+            "raw LLM response completion_text should be sanitized before yielding: "
+            f"{response.completion_text!r}, {getattr(response, '_completion_text', None)!r}"
+        )
+    if response.reasoning_content != "内部推理":
+        raise AssertionError(
+            "raw LLM response reasoning_content should be sanitized before yielding: "
+            f"{response.reasoning_content!r}"
+        )
+
     (
         actual,
         error,
@@ -606,7 +733,7 @@ async def main() -> None:
             f"expected={expected_timing}, got={timing}"
         )
 
-    print(f"ok {len(cases) + 11} cases")
+    print(f"ok {len(cases) + 12} cases")
 
 
 if __name__ == "__main__":
