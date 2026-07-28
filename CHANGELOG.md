@@ -1,3 +1,12 @@
+v2.1.20
+
+修复 Gemini 工具调用历史中的函数名错配.
+
+Bug Fixes:
+
+- 从前一条 assistant tool call 按 `tool_call_id` 回填 `functionResponse.name`,
+  避免 AstrBot 通用 tool-loop 只保留调用 ID 时触发 Gemini 400.
+
 v2.1.19
 
 提前加固 AstrBot tool-loop 原始 LLM response, 防止内部状态在进入发送链路, history 或记忆前泄露.

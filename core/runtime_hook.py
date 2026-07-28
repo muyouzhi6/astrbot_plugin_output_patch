@@ -89,6 +89,72 @@ def _has_provider_tools(runner_self: Any) -> bool:
     return getattr(req, "func_tool", None) is not None
 
 
+def _restore_gemini_tool_names(payloads: Any) -> Any:
+    """Restore Gemini function names when AstrBot only retained tool-call IDs.
+
+    AstrBot's generic tool-loop stores the result as ``role=tool`` with only
+    ``tool_call_id``. Gemini requires ``functionResponse.name`` to match the
+    preceding function call's name, so resolve the ID from the assistant turn
+    before handing the payload to Gemini's converter.
+    """
+    if not isinstance(payloads, dict):
+        return payloads
+
+    messages = payloads.get("messages")
+    if not isinstance(messages, list):
+        return payloads
+
+    tool_names_by_id: dict[str, str] = {}
+    for message in messages:
+        if not isinstance(message, dict) or message.get("role") != "assistant":
+            continue
+        for tool_call in message.get("tool_calls") or []:
+            if not isinstance(tool_call, dict):
+                continue
+            function = tool_call.get("function") or {}
+            if not isinstance(function, dict):
+                continue
+            tool_call_id = tool_call.get("id") or tool_call.get("tool_call_id")
+            tool_name = function.get("name")
+            if tool_call_id and tool_name:
+                tool_names_by_id[str(tool_call_id)] = str(tool_name)
+
+    if not tool_names_by_id:
+        return payloads
+
+    patched_messages: list[Any] = []
+    changed = False
+    for message in messages:
+        if not isinstance(message, dict) or message.get("role") != "tool":
+            patched_messages.append(message)
+            continue
+
+        tool_call_id = message.get("tool_call_id")
+        tool_name = tool_names_by_id.get(str(tool_call_id)) if tool_call_id else None
+        if tool_name and not message.get("name"):
+            patched_message = dict(message)
+            patched_message["name"] = tool_name
+            patched_messages.append(patched_message)
+            changed = True
+        else:
+            patched_messages.append(message)
+
+    if not changed:
+        return payloads
+
+    patched_payloads = dict(payloads)
+    patched_payloads["messages"] = patched_messages
+    logger.debug(
+        "[outputpro:Gemini] restored %d tool response name(s) from tool-call IDs",
+        sum(
+            1
+            for before, after in zip(messages, patched_messages)
+            if before is not after
+        ),
+    )
+    return patched_payloads
+
+
 def _set_completion_text(response: Any, text: str) -> None:
     try:
         response.completion_text = text
@@ -204,6 +270,7 @@ class RuntimeOutputHook:
             self._patch_platform_send_by_session(cls)
 
         self._patch_tool_loop_agent_runner()
+        self._patch_gemini_tool_history()
 
         self._installed = True
 
@@ -493,6 +560,49 @@ class RuntimeOutputHook:
             logger.info(
                 "[outputpro:runtime_hook] installed ToolLoopAgentRunner.step "
                 "tool-call preamble filter"
+            )
+
+    def _patch_gemini_tool_history(self) -> None:
+        try:
+            from astrbot.core.provider.sources.gemini_source import GeminiSource
+        except Exception:
+            logger.debug(
+                "[outputpro:runtime_hook] GeminiSource unavailable; "
+                "skip tool-history name compatibility"
+            )
+            return
+
+        def factory(original):
+            @wraps(original)
+            def wrapped(provider_self, payloads, *args, **kwargs):
+                return original(
+                    provider_self,
+                    _restore_gemini_tool_names(payloads),
+                    *args,
+                    **kwargs,
+                )
+
+            wrapped.__outputpro_gemini_tool_history__ = True
+            return wrapped
+
+        already_installed = bool(
+            getattr(
+                getattr(GeminiSource, "_prepare_conversation", None),
+                "__outputpro_gemini_tool_history__",
+                False,
+            )
+        )
+        self._patch(GeminiSource, "_prepare_conversation", factory)
+        if not already_installed and bool(
+            getattr(
+                getattr(GeminiSource, "_prepare_conversation", None),
+                "__outputpro_gemini_tool_history__",
+                False,
+            )
+        ):
+            logger.info(
+                "[outputpro:runtime_hook] installed Gemini tool-history "
+                "function-name compatibility"
             )
 
     async def _filter_chain(

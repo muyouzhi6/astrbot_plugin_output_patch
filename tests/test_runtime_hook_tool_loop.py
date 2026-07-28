@@ -733,7 +733,39 @@ async def main() -> None:
             f"expected={expected_timing}, got={timing}"
         )
 
-    print(f"ok {len(cases) + 12} cases")
+    original_payloads = {
+        "messages": [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_abc",
+                        "type": "function",
+                        "function": {"name": "grok_web_search", "arguments": "{}"},
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call_abc",
+                "content": "search result",
+            },
+        ]
+    }
+    restored_payloads = runtime_hook_module._restore_gemini_tool_names(
+        original_payloads
+    )
+    restored_tool = restored_payloads["messages"][1]
+    if restored_tool.get("name") != "grok_web_search":
+        raise AssertionError(
+            "Gemini tool response should recover the preceding function name: "
+            f"{restored_tool!r}"
+        )
+    if "name" in original_payloads["messages"][1]:
+        raise AssertionError("tool-name restoration must not mutate the input payload")
+
+    print(f"ok {len(cases) + 13} cases")
 
 
 if __name__ == "__main__":
