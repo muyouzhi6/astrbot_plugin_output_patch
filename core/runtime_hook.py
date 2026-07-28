@@ -564,7 +564,9 @@ class RuntimeOutputHook:
 
     def _patch_gemini_tool_history(self) -> None:
         try:
-            from astrbot.core.provider.sources.gemini_source import GeminiSource
+            from astrbot.core.provider.sources.gemini_source import (
+                ProviderGoogleGenAI,
+            )
         except Exception:
             logger.debug(
                 "[outputpro:runtime_hook] GeminiSource unavailable; "
@@ -587,15 +589,15 @@ class RuntimeOutputHook:
 
         already_installed = bool(
             getattr(
-                getattr(GeminiSource, "_prepare_conversation", None),
+                getattr(ProviderGoogleGenAI, "_prepare_conversation", None),
                 "__outputpro_gemini_tool_history__",
                 False,
             )
         )
-        self._patch(GeminiSource, "_prepare_conversation", factory)
+        self._patch(ProviderGoogleGenAI, "_prepare_conversation", factory)
         if not already_installed and bool(
             getattr(
-                getattr(GeminiSource, "_prepare_conversation", None),
+                getattr(ProviderGoogleGenAI, "_prepare_conversation", None),
                 "__outputpro_gemini_tool_history__",
                 False,
             )
