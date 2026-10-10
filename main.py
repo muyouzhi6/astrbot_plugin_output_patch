@@ -30,6 +30,31 @@ TTS_OUTPUT_MARKER_MODE_STRIP = "strip_visible"
 TTS_PAUSE_TAG_RE = re.compile(r"<#\s*\d+(?:\.\d{1,2})?\s*#>")
 
 
+_LEAKED_THOUGHT_RE = re.compile(r"^\s*thought[ \t]*\r?\n", re.IGNORECASE)
+
+
+def strip_leaked_thought(text):
+    """模型把 'thought' + 英文思考泄漏到正文时，只保留最后一个非空行。"""
+    if not isinstance(text, str) or not _LEAKED_THOUGHT_RE.match(text):
+        return text
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    return lines[-1] if len(lines) > 1 else text
+
+
+def strip_leaked_thought_in_chain(chain) -> bool:
+    plains = [c for c in chain if isinstance(c, Plain)]
+    if not plains:
+        return False
+    joined = "".join(c.text or "" for c in plains)
+    new = strip_leaked_thought(joined)
+    if new == joined:
+        return False
+    plains[0].text = new
+    for c in plains[1:]:
+        c.text = ""
+    return True
+
+
 class OutputPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -70,6 +95,19 @@ class OutputPlugin(Star):
 
         result_chain = getattr(response, "result_chain", None)
         chain = getattr(result_chain, "chain", None)
+
+        if chain and strip_leaked_thought_in_chain(chain):
+            logger.info("[outputpro] stripped leaked 'thought' block from LLM chain")
+        _ct = getattr(response, "completion_text", None)
+        if isinstance(_ct, str):
+            _new_ct = strip_leaked_thought(_ct)
+            if _new_ct != _ct:
+                logger.info("[outputpro] stripped leaked 'thought' block from completion_text")
+                response.completion_text = _new_ct
+                try:
+                    setattr(response, "_completion_text", _new_ct)
+                except Exception:
+                    pass
 
         if chain:
             before_count = len(chain)
@@ -166,6 +204,9 @@ class OutputPlugin(Star):
         result = event.get_result()
         if not result or not result.chain:
             return
+
+        if strip_leaked_thought_in_chain(result.chain):
+            logger.info("[outputpro] stripped leaked 'thought' block before sending")
 
         if result.is_llm_result() and self._is_empty_text_only_chain(result.chain):
             logger.debug(

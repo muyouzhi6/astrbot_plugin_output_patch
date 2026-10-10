@@ -1,3 +1,14 @@
+v2.1.21
+
+过滤模型把 `thought` 思考块直接泄漏到正文的回复.
+
+Bug Fixes:
+
+- 回复以单独一行 `thought` 开头时 (如 Gemini exp 类模型的 `thought` + 英文思考 + 最终回复), 只保留最后一个非空行.
+- 在 `on_llm_response` (result_chain 与 completion_text) 和 `on_decorating_result` 发送前两处生效, 多个 Plain 分段时先拼接再判断, 非文本组件保留.
+- 正文中间出现 thought (如 "我thought你会来的") 或 `thoughts` / `Thoughtful` 开头的正常回复不受影响.
+- 新增容器内端到端手动测试 `tests/e2e_leaked_thought_live.py`.
+
 v2.1.20
 
 修复 Gemini 工具调用历史中的函数名错配.
